@@ -11,8 +11,10 @@
 - JS 实现仓库：[`GanFish404/ruyipage-js`](https://github.com/GanFish404/ruyipage-js)
 - Go 实现仓库：[`pll177/ruyipage-go`](https://github.com/pll177/ruyipage-go)
 - Python 基线仓库：[`LoseNine/ruyipage`](https://github.com/LoseNine/ruyipage)
+- 指纹浏览器仓库（搭配使用）：[`LoseNine/firefox-fingerprintBrowser`](https://github.com/LoseNine/firefox-fingerprintBrowser)
 
 `ruyipage-js` 延续 Python `ruyipage` 的 Firefox + BiDi 技术路线；Go 版 `ruyipage-go` 也是同路线的并行实现。三者都围绕同一类高层自动化能力建设，但分别面向不同语言生态。
+说明：`ruyipage-js` 不强依赖指纹浏览器，使用官方标准 Firefox 也可以完整运行自动化流程；指纹浏览器是“可选增强方案”。
 
 ---
 
@@ -164,6 +166,7 @@ const { FirefoxOptions, FirefoxPage, Keys, By } = require('./index');
 | `set_proxy(proxy)` | `string` | 代理地址 | `http://127.0.0.1:7890` 或 `socks5://127.0.0.1:1080` |
 | `set_auto_port(on)` | `boolean` | 自动端口分配 | 并发启动多个实例时建议 `true` |
 | `set_argument(arg, value?)` | `string` | 追加 Firefox 启动参数 | 按需 |
+| `set_fpfile(path)` | `string` | 指纹配置文件路径（传给 `--fpfile`） | 搭配指纹浏览器时使用 |
 | `set_pref(key, value)` | `string, any` | 写入 Firefox user.js 偏好 | 按需 |
 | `set_user_prompt_handler(config)` | `object` | session 级 prompt 默认策略 | 可选 |
 
@@ -228,6 +231,41 @@ const opts = new FirefoxOptions()
 - **一次性脚本**：可不传 `user_dir`（用临时 profile）；
 - **长期业务脚本**：必须传固定 `user_dir`（保留登录态、缓存、站点设置）；
 - **多账号并发**：每个账号单独 `user_dir`，不要混用。
+
+### 3.5 搭配指纹浏览器（你当前场景）
+
+先说明：这部分是可选能力，不用指纹浏览器也能正常用 `ruyipage-js`。
+
+如果你已经编译好指纹浏览器，核心就是把浏览器可执行路径和 `fpfile` 都传进来：
+
+```js
+const { FirefoxOptions, FirefoxPage } = require('./index');
+
+async function runWithFingerprintBrowser() {
+  const opts = new FirefoxOptions()
+    .set_browser_path('D:\\fingerprint-browser\\firefox.exe') // 你的编译版浏览器路径
+    .set_fpfile('D:\\fingerprints\\profile1.txt') // 指纹配置文件
+    .set_user_dir('D:\\profiles\\user1') // 建议每个账号一个独立目录
+    .set_proxy('http://127.0.0.1:7890') // 可选
+    .set_port(9222);
+
+  const page = await FirefoxPage.create(opts);
+  try {
+    await page.get('https://example.com');
+  } finally {
+    await page.quit();
+  }
+}
+
+runWithFingerprintBrowser().catch(console.error);
+```
+
+使用要点：
+
+- `set_browser_path(...)` 必须指向你编译出来的浏览器 `exe`；
+- `set_fpfile(...)` 对应你准备的指纹配置文件；
+- `set_user_dir(...)` 建议按账号隔离，避免 profile 混用；
+- 该指纹浏览器项目当前说明是 Windows 场景，路径也按 Windows 习惯配置。
 
 ---
 

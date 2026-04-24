@@ -11,8 +11,10 @@ Chinese documentation: `README.md`
 - JS implementation repository: [`GanFish404/ruyipage-js`](https://github.com/GanFish404/ruyipage-js)
 - Python baseline repository: [`LoseNine/ruyipage`](https://github.com/LoseNine/ruyipage)
 - Go implementation repository: [`pll177/ruyipage-go`](https://github.com/pll177/ruyipage-go)
+- Fingerprint browser repository (used together): [`LoseNine/firefox-fingerprintBrowser`](https://github.com/LoseNine/firefox-fingerprintBrowser)
 
 `ruyipage-js` follows the same Firefox + BiDi direction as Python `ruyipage`; the Go version `ruyipage-go` is a parallel implementation on the same track. They target similar high-level automation capabilities in different language ecosystems.
+Note: `ruyipage-js` does not require a fingerprint browser. It works with standard official Firefox; the fingerprint browser is an optional enhancement.
 
 ---
 
@@ -135,6 +137,7 @@ This section explains exactly how to pass launch parameters.
 | `set_proxy(proxy)` | `string` | Proxy address | `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080` |
 | `set_auto_port(on)` | `boolean` | Auto port allocation | `true` for multi-instance startup |
 | `set_argument(arg, value?)` | `string` | Add Firefox launch args | As needed |
+| `set_fpfile(path)` | `string` | Fingerprint file path (passed as `--fpfile`) | Use with fingerprint browser |
 | `set_pref(key, value)` | `string, any` | Write Firefox user.js pref | As needed |
 | `set_user_prompt_handler(config)` | `object` | Session-level default prompt behavior | Optional |
 
@@ -199,6 +202,41 @@ Recommendations:
 - **One-off scripts**: profile can be omitted;
 - **Long-running business scripts**: always set fixed `user_dir`;
 - **Multi-account parallel runs**: one `user_dir` per account.
+
+### 3.5 Using the Fingerprint Browser (Your Scenario)
+
+Important: this is optional. `ruyipage-js` works normally without a fingerprint browser.
+
+If your fingerprint browser is already compiled, pass both the browser executable path and `fpfile`:
+
+```js
+const { FirefoxOptions, FirefoxPage } = require('./index');
+
+async function runWithFingerprintBrowser() {
+  const opts = new FirefoxOptions()
+    .set_browser_path('D:\\fingerprint-browser\\firefox.exe') // your compiled browser executable
+    .set_fpfile('D:\\fingerprints\\profile1.txt') // fingerprint config file
+    .set_user_dir('D:\\profiles\\user1') // recommended: one profile per account
+    .set_proxy('http://127.0.0.1:7890') // optional
+    .set_port(9222);
+
+  const page = await FirefoxPage.create(opts);
+  try {
+    await page.get('https://example.com');
+  } finally {
+    await page.quit();
+  }
+}
+
+runWithFingerprintBrowser().catch(console.error);
+```
+
+Key points:
+
+- `set_browser_path(...)` must point to your compiled browser `exe`;
+- `set_fpfile(...)` should point to your fingerprint config file;
+- `set_user_dir(...)` should be isolated per account;
+- The fingerprint browser project currently documents a Windows-focused setup, so Windows-style paths are used in examples.
 
 ---
 
