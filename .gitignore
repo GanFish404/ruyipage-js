@@ -28,6 +28,3 @@ venv/
 #local test
 node_modules/
 test/
-
-# github
-.github/
