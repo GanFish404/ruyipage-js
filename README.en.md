@@ -8,7 +8,7 @@ Chinese documentation: `README.md`
 
 ## Repository Relationship
 
-- JS implementation repository: [`GanFish404/ruyipage-js`]（https://github.com/GanFish404/ruyipage-js）
+- JS implementation repository: [`GanFish404/ruyipage-js`](https://github.com/GanFish404/ruyipage-js)
 - Python baseline repository: [`LoseNine/ruyipage`](https://github.com/LoseNine/ruyipage)
 - Go implementation repository: [`pll177/ruyipage-go`](https://github.com/pll177/ruyipage-go)
 
@@ -71,6 +71,34 @@ main().catch(console.error);
 
 ---
 
+## First-Time User Path
+
+Recommended order for beginners:
+
+1. Run the minimal script only: `create -> get -> read title -> quit`  
+2. Add element operations: `ele -> input/click`  
+3. Add script execution: `run_js`  
+4. Add advanced flows: prompt, frame, multi-tab, network
+
+Use this stable template to avoid unclosed browser sessions:
+
+```js
+const { FirefoxOptions, FirefoxPage } = require('./index');
+
+async function run() {
+  const page = await FirefoxPage.create(new FirefoxOptions());
+  try {
+    // your business steps
+  } finally {
+    await page.quit();
+  }
+}
+
+run().catch(console.error);
+```
+
+---
+
 ## 3. Core Objects
 
 - `FirefoxOptions`: browser launch options
@@ -87,6 +115,93 @@ const { FirefoxOptions, FirefoxPage, Keys, By } = require('./index');
 
 ---
 
+## Startup Options (Important)
+
+This section explains exactly how to pass launch parameters.
+
+### 3.1 Common `FirefoxOptions` Parameters
+
+| Method | Parameter | Description | Recommended |
+| --- | --- | --- | --- |
+| `set_browser_path(path)` | `string` | Firefox executable path | Windows common: `C:\\Program Files\\Mozilla Firefox\\firefox.exe` |
+| `set_address("host:port")` | `string` | Debug address (host+port) | `127.0.0.1:9222` |
+| `set_port(port)` | `number` | Debug port only | `9222` (default) |
+| `set_user_dir(dir)` / `set_profile(dir)` | `string` | User data directory (profile) | Use fixed directory for business scripts |
+| `headless(on)` | `boolean` | Headless mode | `false` for debug, `true` for CI |
+| `private_mode(on)` | `boolean` | Private mode | Optional |
+| `set_window_size(w, h)` | `number, number` | Startup window size | `1280, 800` |
+| `set_timeouts({ base, page_load, script })` | `object` | Timeouts in seconds | `base:10,page_load:30,script:30` |
+| `set_download_path(path)` | `string` | Download directory | Fixed project path |
+| `set_proxy(proxy)` | `string` | Proxy address | `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080` |
+| `set_auto_port(on)` | `boolean` | Auto port allocation | `true` for multi-instance startup |
+| `set_argument(arg, value?)` | `string` | Add Firefox launch args | As needed |
+| `set_pref(key, value)` | `string, any` | Write Firefox user.js pref | As needed |
+| `set_user_prompt_handler(config)` | `object` | Session-level default prompt behavior | Optional |
+
+### 3.2 Step-by-Step Startup Path
+
+```js
+const { FirefoxOptions, FirefoxPage } = require('./index');
+
+async function bootstrap() {
+  const opts = new FirefoxOptions()
+    .set_browser_path('C:\\Program Files\\Mozilla Firefox\\firefox.exe')
+    .set_user_dir('D:\\ruyipage_user_data')
+    .set_port(9222)
+    .headless(false)
+    .set_window_size(1280, 800)
+    .set_timeouts({ base: 10, page_load: 30, script: 30 });
+
+  const page = await FirefoxPage.create(opts);
+  try {
+    await page.get('https://example.com');
+  } finally {
+    await page.quit();
+  }
+}
+
+bootstrap().catch(console.error);
+```
+
+### 3.3 Proxy Usage
+
+```js
+const opts = new FirefoxOptions()
+  .set_user_dir('D:\\ruyipage_user_data_proxy')
+  .set_proxy('http://127.0.0.1:7890');
+```
+
+SOCKS5 example:
+
+```js
+const opts = new FirefoxOptions()
+  .set_user_dir('D:\\ruyipage_user_data_proxy')
+  .set_proxy('socks5://127.0.0.1:1080');
+```
+
+Notes:
+
+- Use proxy with `set_user_dir(...)` so prefs persist in that profile;
+- Use `scheme://host:port` format;
+- For proxy switching, prefer separate `user_dir` profiles to avoid stale settings.
+
+### 3.4 user-data-dir (`user_dir`) Usage
+
+`set_user_dir(path)` is the user-data-dir entry (Firefox profile):
+
+```js
+const opts = new FirefoxOptions()
+  .set_user_dir('D:\\ruyipage_user_data_main');
+```
+
+Recommendations:
+
+- **One-off scripts**: profile can be omitted;
+- **Long-running business scripts**: always set fixed `user_dir`;
+- **Multi-account parallel runs**: one `user_dir` per account.
+
+---
+
 ## 4. Page APIs
 
 ### 4.1 Navigation
@@ -95,6 +210,26 @@ const { FirefoxOptions, FirefoxPage, Keys, By } = require('./index');
 - `await page.back()`
 - `await page.forward()`
 - `await page.refresh()`
+
+Parameter guide (`page.get(url, wait?, timeout?)`):
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `url` | `string` | Target URL, preferably full `https://...` |
+| `wait` | `boolean` / `undefined` | Whether to wait for load completion |
+| `timeout` | `number` / `undefined` | Navigation timeout in seconds |
+
+Recommendations:
+
+- `wait`: beginners can keep default behavior first;
+- `timeout`: start with `10~20` seconds, then tune;
+- `url`: prefer full URL (`https://...`) to avoid context confusion.
+
+Example:
+
+```js
+await page.get('https://example.com', true, 15);
+```
 
 ### 4.2 Element Query
 
@@ -105,10 +240,54 @@ Locator examples:
 - CSS: `'css:#login-btn'` or `'#login-btn'`
 - XPath: `'xpath://button[@id="login-btn"]'`
 
+Parameter guide (`page.ele(locator, index?, timeout?)`):
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `locator` | `string` | Locator expression |
+| `index` | `number` / `undefined` | Match index (commonly `1`) |
+| `timeout` | `number` / `undefined` | Lookup timeout in seconds |
+
+Recommendations:
+
+- Start with CSS locators first;
+- Use `index=1` unless you explicitly need the Nth match;
+- Use `3~8` seconds timeout for dynamic pages.
+
+Parameter call examples:
+
+```js
+const first = await page.ele('#submit', 1, 5);
+const second = await page.ele('.item', 2, 3);
+```
+
 ### 4.3 JavaScript Execution
 
 - `await page.run_js(script, ...args)`
 - `await page.run_js('document.title', { as_expr: true })`
+
+Parameter guide (`run_js`):
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `script` | `string` | Script content |
+| `...args` | `any[]` | Script arguments |
+| `as_expr` | `boolean` | Execute as expression |
+| `timeout` | `number` | Script timeout in seconds |
+| `sandbox` | `string` | Sandbox name |
+
+Recommendations:
+
+- Use `as_expr: true` for quick value reads;
+- Use `return ...` style for complex scripts;
+- Skip `sandbox` at the beginning, add later if needed.
+
+Parameter call examples:
+
+```js
+const sum = await page.run_js('return arguments[0] + arguments[1];', 1, 2);
+const title = await page.run_js('document.title', { as_expr: true, timeout: 5 });
+```
 
 ### 4.4 Page Info
 
@@ -161,6 +340,27 @@ Supported strategies:
 - `'dismiss'`
 - `'ignore'`
 
+Parameter guide (`set_prompt_handler(config)`):
+
+| Field | Allowed values | Description |
+| --- | --- | --- |
+| `alert` | `accept/dismiss/ignore` | Alert strategy |
+| `confirm` | `accept/dismiss/ignore` | Confirm strategy |
+| `prompt` | `accept/dismiss/ignore` | Prompt strategy |
+| `default` | `accept/dismiss/ignore` | Fallback strategy |
+| `prompt_text` | `string` | Auto input text for prompt |
+
+Beginner-friendly baseline:
+
+```js
+await page.set_prompt_handler({
+  alert: 'dismiss',
+  confirm: 'accept',
+  prompt: 'ignore',
+  default: 'dismiss',
+});
+```
+
 ### 6.2 Manual Handling
 
 - `await page.wait_prompt(timeout?)`
@@ -171,6 +371,29 @@ Supported strategies:
 ### 6.3 Prompt Login Flow
 
 - `await page.prompt_login(locator, username, password, trigger?, timeout?)`
+
+Parameter guide (`prompt_login`):
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `locator` | `string` | Locator for the element that triggers login prompt |
+| `username` | `string` | First prompt input |
+| `password` | `string` | Second prompt input |
+| `trigger` | `string` / `undefined` | Trigger mode (commonly `mouse`) |
+| `timeout` | `number` / `undefined` | Timeout in seconds |
+
+Example:
+
+```js
+await page.prompt_login('#login-btn', 'alice', 'p@ssw0rd', 'mouse', 8);
+```
+
+Flow explanation:
+
+1. Locate and trigger the login action by `locator`;  
+2. First prompt receives `username`;  
+3. Second prompt receives `password`;  
+4. Timeout/error should be handled by outer `try/finally`.
 
 ---
 
@@ -240,3 +463,17 @@ casePromptHandler();
 - Always call `await page.quit()` in `finally`
 - For dynamic pages, add timeout/retry strategy for element lookup
 - Avoid mixing auto prompt handling and manual handling at the same moment
+- Start with CSS locators first, then introduce XPath when needed
+- Stabilize single-page flows first, then add frame/tab/prompt complexity
+
+---
+
+## Parameter Quick Copy
+
+```js
+await page.get('https://example.com', true, 15);
+const ele = await page.ele('#submit', 1, 5);
+const value = await page.run_js('document.title', { as_expr: true, timeout: 5 });
+await page.set_prompt_handler({ alert: 'dismiss', confirm: 'accept', prompt: 'ignore', default: 'dismiss' });
+await page.prompt_login('#login-btn', 'alice', 'p@ssw0rd', 'mouse', 8);
+```

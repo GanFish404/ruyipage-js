@@ -8,7 +8,7 @@
 
 ## 仓库关系
 
-- JS 实现仓库：[`GanFish404/ruyipage-js`]（https://github.com/GanFish404/ruyipage-js）
+- JS 实现仓库：[`GanFish404/ruyipage-js`](https://github.com/GanFish404/ruyipage-js)
 - Go 实现仓库：[`pll177/ruyipage-go`](https://github.com/pll177/ruyipage-go)
 - Python 基线仓库：[`LoseNine/ruyipage`](https://github.com/LoseNine/ruyipage)
 
@@ -100,6 +100,34 @@ main().catch(console.error);
 
 ---
 
+## 新手上手路径（第一次用建议）
+
+按下面顺序走，基本不会懵：
+
+1. **先只跑最小脚本**：`create -> get -> 读 title -> quit`  
+2. **再加元素操作**：`ele -> input/click`  
+3. **再加脚本执行**：`run_js`  
+4. **最后加复杂能力**：prompt、frame、多 tab、网络相关
+
+建议固定这个模板，避免资源没释放：
+
+```js
+const { FirefoxOptions, FirefoxPage } = require('./index');
+
+async function run() {
+  const page = await FirefoxPage.create(new FirefoxOptions());
+  try {
+    // your business steps
+  } finally {
+    await page.quit();
+  }
+}
+
+run().catch(console.error);
+```
+
+---
+
 ## 3. 核心对象
 
 - `FirefoxOptions`：浏览器启动配置
@@ -116,6 +144,93 @@ const { FirefoxOptions, FirefoxPage, Keys, By } = require('./index');
 
 ---
 
+## 启动参数（重点）
+
+这一节专门讲“浏览器怎么启动、参数怎么传”，新手先看这里。
+
+### 3.1 `FirefoxOptions` 常用参数
+
+| 方法 | 参数 | 说明 | 推荐值 |
+| --- | --- | --- | --- |
+| `set_browser_path(path)` | `string` | Firefox 可执行文件路径 | Windows 常见：`C:\\Program Files\\Mozilla Firefox\\firefox.exe` |
+| `set_address("host:port")` | `string` | 调试地址（同时设置 host+port） | `127.0.0.1:9222` |
+| `set_port(port)` | `number` | 仅设置调试端口 | `9222`（默认） |
+| `set_user_dir(dir)` / `set_profile(dir)` | `string` | 用户数据目录（profile） | 业务场景建议固定目录 |
+| `headless(on)` | `boolean` | 无头模式 | 调试阶段 `false`，CI 可 `true` |
+| `private_mode(on)` | `boolean` | 隐私模式 | 按需开启 |
+| `set_window_size(w, h)` | `number, number` | 启动窗口大小 | `1280, 800` |
+| `set_timeouts({ base, page_load, script })` | `object` | 三类超时（秒） | `base:10,page_load:30,script:30` |
+| `set_download_path(path)` | `string` | 下载目录 | 项目内固定目录 |
+| `set_proxy(proxy)` | `string` | 代理地址 | `http://127.0.0.1:7890` 或 `socks5://127.0.0.1:1080` |
+| `set_auto_port(on)` | `boolean` | 自动端口分配 | 并发启动多个实例时建议 `true` |
+| `set_argument(arg, value?)` | `string` | 追加 Firefox 启动参数 | 按需 |
+| `set_pref(key, value)` | `string, any` | 写入 Firefox user.js 偏好 | 按需 |
+| `set_user_prompt_handler(config)` | `object` | session 级 prompt 默认策略 | 可选 |
+
+### 3.2 启动参数调用路径（一步步）
+
+```js
+const { FirefoxOptions, FirefoxPage } = require('./index');
+
+async function bootstrap() {
+  const opts = new FirefoxOptions()
+    .set_browser_path('C:\\Program Files\\Mozilla Firefox\\firefox.exe')
+    .set_user_dir('D:\\ruyipage_user_data')
+    .set_port(9222)
+    .headless(false)
+    .set_window_size(1280, 800)
+    .set_timeouts({ base: 10, page_load: 30, script: 30 });
+
+  const page = await FirefoxPage.create(opts);
+  try {
+    await page.get('https://example.com');
+  } finally {
+    await page.quit();
+  }
+}
+
+bootstrap().catch(console.error);
+```
+
+### 3.3 代理怎么用（重点）
+
+```js
+const opts = new FirefoxOptions()
+  .set_user_dir('D:\\ruyipage_user_data_proxy')
+  .set_proxy('http://127.0.0.1:7890');
+```
+
+SOCKS5 示例：
+
+```js
+const opts = new FirefoxOptions()
+  .set_user_dir('D:\\ruyipage_user_data_proxy')
+  .set_proxy('socks5://127.0.0.1:1080');
+```
+
+说明：
+
+- 建议代理与 `set_user_dir(...)` 一起使用，配置会写入该 profile 的 `user.js`；
+- 代理字符串建议用 `scheme://host:port` 形式；
+- 如果你要切换代理，建议切换不同 `user_dir`，避免 profile 残留配置混淆。
+
+### 3.4 user-data-dir（`user_dir`）怎么配置
+
+`set_user_dir(path)` 就是你要的 `user-data-dir`（Firefox profile）入口：
+
+```js
+const opts = new FirefoxOptions()
+  .set_user_dir('D:\\ruyipage_user_data_main');
+```
+
+建议：
+
+- **一次性脚本**：可不传 `user_dir`（用临时 profile）；
+- **长期业务脚本**：必须传固定 `user_dir`（保留登录态、缓存、站点设置）；
+- **多账号并发**：每个账号单独 `user_dir`，不要混用。
+
+---
+
 ## 4. 页面能力
 
 ### 4.1 导航
@@ -124,6 +239,26 @@ const { FirefoxOptions, FirefoxPage, Keys, By } = require('./index');
 - `await page.back()`
 - `await page.forward()`
 - `await page.refresh()`
+
+参数说明（`page.get(url, wait?, timeout?)`）：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `url` | `string` | 目标地址，建议完整 `https://...` |
+| `wait` | `boolean` / `undefined` | 是否等待页面加载完成 |
+| `timeout` | `number` / `undefined` | 导航超时（秒） |
+
+参数建议：
+
+- `wait`：新手建议先不传，使用默认行为；
+- `timeout`：首轮调试建议 `10~20` 秒，网络慢时再增大；
+- `url`：尽量使用完整 URL，避免相对地址带来的上下文问题。
+
+示例（推荐新手写法）：
+
+```js
+await page.get('https://example.com', true, 15);
+```
 
 ### 4.2 元素查找
 
@@ -134,10 +269,54 @@ const { FirefoxOptions, FirefoxPage, Keys, By } = require('./index');
 - CSS: `'css:#login-btn'` or `'#login-btn'`
 - XPath: `'xpath://button[@id="login-btn"]'`
 
+参数说明（`page.ele(locator, index?, timeout?)`）：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `locator` | `string` | 定位表达式 |
+| `index` | `number` / `undefined` | 第几个匹配结果（常用 `1`） |
+| `timeout` | `number` / `undefined` | 查找超时（秒） |
+
+参数建议：
+
+- `locator`：新手优先用 CSS；  
+- `index`：默认用 `1`，除非明确要第 N 个；  
+- `timeout`：动态页面建议 `3~8` 秒。
+
+参数调用示例：
+
+```js
+const first = await page.ele('#submit', 1, 5);
+const second = await page.ele('.item', 2, 3);
+```
+
 ### 4.3 脚本执行
 
 - `await page.run_js(script, ...args)`
 - `await page.run_js('document.title', { as_expr: true })`
+
+参数说明（`run_js`）：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `script` | `string` | 执行脚本文本 |
+| `...args` | `any[]` | 传给脚本的参数 |
+| `as_expr` | `boolean` | 按表达式执行 |
+| `timeout` | `number` | 脚本超时（秒） |
+| `sandbox` | `string` | 指定 sandbox |
+
+参数建议：
+
+- 只取值时优先 `as_expr: true`；  
+- 脚本较复杂时用 `return ...` 形式并设置 `timeout`；  
+- 初学者先不要用 `sandbox`，先跑通主流程再细分隔离执行。
+
+参数调用示例：
+
+```js
+const sum = await page.run_js('return arguments[0] + arguments[1];', 1, 2);
+const title = await page.run_js('document.title', { as_expr: true, timeout: 5 });
+```
 
 ### 4.4 页面信息
 
@@ -190,6 +369,32 @@ await page.set_prompt_handler({
 - `'dismiss'`
 - `'ignore'`
 
+参数说明（`set_prompt_handler(config)`）：
+
+| 字段 | 可选值 | 说明 |
+| --- | --- | --- |
+| `alert` | `accept/dismiss/ignore` | alert 策略 |
+| `confirm` | `accept/dismiss/ignore` | confirm 策略 |
+| `prompt` | `accept/dismiss/ignore` | prompt 策略 |
+| `default` | `accept/dismiss/ignore` | 默认策略 |
+| `prompt_text` | `string` | prompt 自动输入文本 |
+
+新手建议策略（通用稳妥版）：
+
+```js
+await page.set_prompt_handler({
+  alert: 'dismiss',
+  confirm: 'accept',
+  prompt: 'ignore',
+  default: 'dismiss',
+});
+```
+
+说明：
+
+- `prompt_text` 仅用于 prompt 输入场景；
+- 如果你使用了自动策略，就不要同时在同一时刻再手动 `accept_prompt`/`dismiss_prompt`。
+
 ### 6.2 手动处理
 
 - `await page.wait_prompt(timeout?)`
@@ -200,6 +405,29 @@ await page.set_prompt_handler({
 ### 6.3 登录弹窗场景
 
 - `await page.prompt_login(locator, username, password, trigger?, timeout?)`
+
+参数说明（`prompt_login`）：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `locator` | `string` | 触发登录弹窗的元素定位器 |
+| `username` | `string` | 第一个 prompt 输入值 |
+| `password` | `string` | 第二个 prompt 输入值 |
+| `trigger` | `string` / `undefined` | 触发方式（常见 `mouse`） |
+| `timeout` | `number` / `undefined` | 超时秒数 |
+
+参数调用示例（按顺序）：
+
+```js
+await page.prompt_login('#login-btn', 'alice', 'p@ssw0rd', 'mouse', 8);
+```
+
+调用路径理解（给新手）：
+
+1. 先通过 `locator` 定位并触发登录动作；  
+2. 第一个 prompt 注入 `username`；  
+3. 第二个 prompt 注入 `password`；  
+4. 超时或流程异常时抛错，建议外层 `try/finally` 兜底退出。
 
 ---
 
@@ -269,6 +497,22 @@ casePromptHandler();
 - 建议每个脚本都在 `finally` 里调用 `await page.quit()`
 - 对于动态页面，元素查找建议加超时与重试策略
 - Prompt 自动处理与手动处理不要混用在同一时刻，避免语义冲突
+- 新手建议先只用 CSS 定位，稳定后再引入 XPath
+- 先跑通单页面流程，再叠加 frame/tab/prompt 等复杂功能
+
+---
+
+## 参数速记（新手版）
+
+以下是最常用 API 的“直接可抄”参数模板：
+
+```js
+await page.get('https://example.com', true, 15);
+const ele = await page.ele('#submit', 1, 5);
+const value = await page.run_js('document.title', { as_expr: true, timeout: 5 });
+await page.set_prompt_handler({ alert: 'dismiss', confirm: 'accept', prompt: 'ignore', default: 'dismiss' });
+await page.prompt_login('#login-btn', 'alice', 'p@ssw0rd', 'mouse', 8);
+```
 
 ---
 
