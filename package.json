@@ -1,6 +1,6 @@
 {
   "name": "ruyipage-js",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "基于 WebDriver BiDi 协议的 Firefox 浏览器自动化框架 (Node.js 版)",
   "main": "index.js",
   "scripts": {
