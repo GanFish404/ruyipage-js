@@ -1,6 +1,5 @@
 'use strict';
 
-const { __version__ } = require('./version');
 const { FirefoxPage, normalizePageOptions } = require('./_pages/firefox_page');
 const { wrapPageInvoke } = require('./_pages/firefox_base');
 const { FirefoxTab } = require('./_pages/firefox_tab');
@@ -216,7 +215,6 @@ async function auto_attach_exist_browser_by_process({
 }
 
 module.exports = {
-  __version__,
   FirefoxPage,
   wrapPageInvoke,
   normalizePageOptions,
